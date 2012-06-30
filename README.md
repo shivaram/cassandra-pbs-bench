@@ -6,8 +6,8 @@ Benchmark for measuring PBS overhead in Cassandra
 Requirements
 
   * Python
-  * EC2 api tools (http://aws.amazon.com/developertools/351/)
-
+  * Install EC2 api tools in $PATH (http://aws.amazon.com/developertools/351/)
+  * Export EC2_CERT, EC2_PRIVATE_KEY
 
 Instructions to run the benchmark
 

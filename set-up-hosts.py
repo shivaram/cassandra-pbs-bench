@@ -66,13 +66,13 @@ def start_cluster(num_hosts):
     hosts = get_instances()
 
     make_instancefile("all-hosts.txt", [h[0] for h in hosts])
+    # Set first host as leader
+    make_instancefile("cassandra-leader.txt", [hosts[0][0]])
 
     print "Done"
 
     sleep(30)
     print "Awake!"
-
-    exit(-1)
 
 
 def setup_cluster():
@@ -88,15 +88,24 @@ def setup_cluster():
     run_script("all-hosts", "scripts/fix-hosts-file.sh")
     print "Done"
 
+    print "Installing NTP (Ignore failures)..."
+    run_cmd("all-hosts", "sudo apt-get -q -y install ntp")
+    run_cmd("all-hosts", "sudo ntpd -q")
+    print "Done"
 
-def stop_and_clear_cassandra():
-    kill_cassandra()
-    clean_cassandra()
+    print "Installing Jmxterm..."
+    run_cmd("all-hosts", "wget http://downloads.sourceforge.net/"\
+            "cyclops-group/jmxterm-1.0-alpha-4-uber.jar",
+            user="ubuntu")
+    print "Done"
 
 
-def start_cassandra():
-    set_up_cassandra_ring()
-    launch_cassandra_ring()
+def clone_cassandra_pbs(): 
+    run_cmd("all-hosts", "rm -rf cassandra", user="ubuntu")
+    run_cmd("all-hosts", 
+            "git clone https://github.com/pbailis/cassandra-pbs cassandra",
+            user="ubuntu")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Setup cassandra on EC2')
@@ -104,7 +113,8 @@ if __name__ == "__main__":
                         help='Launch EC2 cluster')
     parser.add_argument('--restart', '-r', action='store_true',
                         help='Restart cassandra cluster')
-    parser.add_argument('-n', dest='machines', nargs='?', default=4,
+    parser.add_argument('--machines', '-n', dest='machines', nargs='?', 
+                        default=4, 
                         help='Number of machines in cluster, default=4')
     args = parser.parse_args()
 
@@ -112,11 +122,15 @@ if __name__ == "__main__":
         print "Launching cassandra cluster"
         start_cluster(args.machines)
         setup_cluster()
+        clone_cassandra_pbs()
+        checkout_cassandra_pbs()
 
     if args.restart:
         print "Restarting cassandra cluster"
-        stop_and_clear_cassandra()
-        start_cassandra()
+        kill_cassandra("all-hosts")
+        clean_cassandra("all-hosts")
+        set_up_cassandra_ring("all-hosts")
+        launch_cassandra_ring("all-hosts")
 
     if not args.launch and not args.restart:
         parser.print_help()

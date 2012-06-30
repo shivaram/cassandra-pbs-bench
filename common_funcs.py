@@ -1,6 +1,7 @@
 # Common helper functions
 
-from os import system, getpid
+import subprocess
+from os import system
 from time import sleep
 
 cassandra_root_dir = "/home/ubuntu/cassandra/"
@@ -11,6 +12,10 @@ def run_cmd(hosts, cmd, user="root"):
 
 def run_cmd_single(host, cmd, user="root"):
     system("ssh %s@%s \"%s\"" % (user, host, cmd))
+
+def run_process_single(host, cmd, user="root", stdout=None, stderr=None):
+    subprocess.call("ssh %s@%s \"%s\"" % (user, host, cmd),
+            stdout=stdout, stderr=stderr, shell=True)
 
 def run_script(hosts, script, user="root"):
     system("cp %s /tmp" % (script))
@@ -42,9 +47,9 @@ def get_node_ips():
         ret.append((line[3], line[13], line[14], line[1]))
     return ret
 
-def get_cassandra_hosts():
+def get_cassandra_hosts(hosts):
     ret = []
-    cips = get_host_ips("cassandra-hosts")
+    cips = get_host_ips(hosts)
     #argh should use a comprehension/filter; i'm tired
     for h in get_node_ips():
         if h[0] in cips:
@@ -52,15 +57,15 @@ def get_cassandra_hosts():
 
     return ret
 
-def get_matching_ip(host):
-    cips = get_host_ips("cassandra-hosts")
+def get_matching_ip(host, hosts):
+    cips = get_host_ips(hosts)
     #argh should use a comprehension/filter; i'm tired
     for h in get_node_ips():
         if h[0] == host:
             return h[1]
 
-def change_cassandra_listen_address():
-    for host_tuple in get_cassandra_hosts():
+def change_cassandra_listen_address(hosts):
+    for host_tuple in get_cassandra_hosts(hosts):
         run_cmd_single(host_tuple[0], "sed -i 's/listen_address: localhost/listen_address: %s/' %s/conf/cassandra.yaml" % (host_tuple[2], cassandra_root_dir))
         run_cmd_single(host_tuple[0], "sed -i 's/rpc_address: localhost/rpc_address: %s/' %s/conf/cassandra.yaml" % (host_tuple[0], cassandra_root_dir))
         run_cmd_single(host_tuple[0], "echo -e \\\"\\nbroadcast_address: %s\\n\\\" >> %s/conf/cassandra.yaml" % (host_tuple[1], cassandra_root_dir))
@@ -110,30 +115,27 @@ def check_cassandra_ring(host, desiredcnt):
         print "Saw all %d nodes" % (desiredcnt)
         return True
 
-def set_up_cassandra_ring():
-    #probably won't change, but let's do it anyway
-    hostgroup = "cassandra-hosts"
-
-    run_cmd("cassandra-hosts", "rm -rf /var/lib/cassandra/*")
+def set_up_cassandra_ring(hosts):
+    run_cmd(hosts, "rm -rf /var/lib/cassandra/*")
     print "Getting host ips..."
-    chosts = get_host_ips(hostgroup)
+    chosts = get_host_ips(hosts)
     print "Done"
 
     leader = chosts[0]
 
-    leaderPublicIP = get_matching_ip(leader)
+    leaderPublicIP = get_matching_ip(leader, hosts)
 
     #change seed
     print "Changing Cassandra seeds..."
-    change_cassandra_seeds(hostgroup, leaderPublicIP)
+    change_cassandra_seeds(hosts, leaderPublicIP)
     print "Done"
 
     print "Changing listen addresses seeds..."
-    change_cassandra_listen_address()
+    change_cassandra_listen_address(hosts)
     print "Done"
 
     print "Changing logger..."
-    change_cassandra_logger(hostgroup)
+    change_cassandra_logger(hosts)
     print "Done"
 
     print "Changing initial tokens..."
@@ -143,9 +145,9 @@ def set_up_cassandra_ring():
         run_cmd_single(curnode, "sed -i 's/initial_token:/initial_token: %d/' %s/conf/cassandra.yaml" % (token, cassandra_root_dir))
     print "Done"
 
-def launch_cassandra_ring():
+def launch_cassandra_ring(hosts):
 
-    chosts = get_host_ips("cassandra-hosts")
+    chosts = get_host_ips(hosts)
     print "Done"
 
     leader = chosts[0]
@@ -162,3 +164,28 @@ def launch_cassandra_ring():
     if(not check_cassandra_ring(leader, len(chosts))):
         print "EXITING"
         exit(-1)
+
+def checkout_cassandra_pbs():
+    run_cmd("all-hosts", 
+            "cd cassandra && git checkout for-cassandra && "\
+            "git checkout -- . && ant", user="ubuntu")
+
+
+def checkout_cassandra_trunk(): 
+    run_cmd("all-hosts", 
+            "cd cassandra && git checkout cassandra-trunk && "\
+            "git checkout -- . && ant", user="ubuntu")
+
+def enable_pbs_jmx():
+    run_script("all-hosts", "scripts/enable_pbs_logging.sh",
+                user="ubuntu")
+
+def disable_pbs_jmx():
+    run_script("all-hosts", "scripts/disable_pbs_logging.sh",
+                user="ubuntu")
+
+def set_pbs_jmx(pbs):
+    if pbs:
+        enable_pbs_jmx()
+    else:
+        disable_pbs_jmx()
