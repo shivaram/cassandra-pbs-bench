@@ -12,9 +12,10 @@ Requirements
 Instructions to run the benchmark
 
 1. Launch a EC2 cluster with PBS AMI.
-   python set-up-hosts.py --launch -n 4
+   python setup_hosts.py --launch -n 4
 
-2. Run cassandra-stress benchmark using test_perf.sh
+2. Run benchmark using bench_pbs.py. Example:
+   python bench_pbs.py --trunk -i 1 -o 10000 -r 1 -w 1
 
 
 Authors: 

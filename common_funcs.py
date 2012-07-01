@@ -165,16 +165,10 @@ def launch_cassandra_ring(hosts):
         print "EXITING"
         exit(-1)
 
-def checkout_cassandra_pbs():
-    run_cmd("all-hosts", 
-            "cd cassandra && git checkout for-cassandra && "\
-            "git checkout -- . && ant", user="ubuntu")
-
-
-def checkout_cassandra_trunk(): 
-    run_cmd("all-hosts", 
-            "cd cassandra && git checkout cassandra-trunk && "\
-            "git checkout -- . && ant", user="ubuntu")
+def checkout_branch(branch):
+    run_cmd("all-hosts",
+            "cd cassandra && git checkout -- . && git checkout %s && "\
+            "git checkout -- . && ant" % (branch), user="ubuntu")
 
 def enable_pbs_jmx():
     run_script("all-hosts", "scripts/enable_pbs_logging.sh",
