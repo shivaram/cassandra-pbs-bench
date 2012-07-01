@@ -23,7 +23,8 @@ def GetConsistencyLevel(value):
         return "QUORUM"
 
 
-def RunBenchmark(iters, ops, r, w, out_prefix, pbs, branch, replicas=3):
+def RunBenchmark(iters, ops, r, w, out_prefix, pbs, branch, replicas=3,
+        threads=50):
     for i in xrange(0, iters):
         # Checkout the right branch
         checkout_branch(branch)
@@ -50,15 +51,15 @@ def RunBenchmark(iters, ops, r, w, out_prefix, pbs, branch, replicas=3):
 
         # Run insert test
         run_process_single(leader, "cd cassandra; ./tools/bin/cassandra-stress"\
-                           " -d %s -l %d -e %s -n %d -o insert" % (leader,
-                               replicas, GetConsistencyLevel(w), ops),
+                           " -d %s -l %d -e %s -n %d -t %d -o insert" % (leader,
+                               replicas, GetConsistencyLevel(w), ops, threads),
                            user="ubuntu", stdout=f_out_insert,
                            stderr=f_out_insert)
 
         # Run read test
         run_process_single(leader, "cd cassandra; ./tools/bin/cassandra-stress"\
-                           " -d %s -l %d -e %s -n %d -o read" % (leader,
-                               replicas, GetConsistencyLevel(r), ops),
+                           " -d %s -l %d -e %s -n %d -t %d -o read" % (leader,
+                               replicas, GetConsistencyLevel(r), ops, threads),
                            user="ubuntu", stdout=f_out_read, stderr=f_out_read)
 
 if __name__ == "__main__":
@@ -75,6 +76,9 @@ if __name__ == "__main__":
     parser.add_argument('--replication-factor', '-f', dest='replicas', 
                         default=3, type=int, 
                         help='Replication factor for the keyspace (default 3)')
+    parser.add_argument('--threads', '-t', dest='threads', 
+                        default=50, type=int, 
+                        help='Number of threads to use in stress')
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('--pbs-on', action='store_true',
                         help='Run using PBS branch with logging on')
@@ -92,16 +96,16 @@ if __name__ == "__main__":
         RunBenchmark(pbs=True, branch='for-cassandra', iters=args.iters,
                 ops=args.ops, r=args.r, w=args.w,
                 out_prefix="pbs-R%dW%d" % (args.r, args.w),
-                replicas=args.replicas)
+                replicas=args.replicas, threads=args.threads)
     elif args.pbs_off:
         print "Running with PBS OFF"
         RunBenchmark(pbs=False, branch='for-cassandra', iters=args.iters,
                 ops=args.ops, r=args.r, w=args.w,
                 out_prefix="no-pbs-R%dW%d" % (args.r, args.w),
-                replicas=args.replicas)
+                replicas=args.replicas, threads=args.threads)
     else:
         print "Running with Cassandra trunk"
         RunBenchmark(pbs=False, branch='cassandra-trunk', iters=args.iters, 
                 ops=args.ops, r=args.r, w=args.w,
                 out_prefix="trunk-R%dW%d" % (args.r, args.w),
-                replicas=args.replicas)
+                replicas=args.replicas, threads=args.threads)
