@@ -91,6 +91,8 @@ def start_cluster(num_hosts):
     while get_num_running_instances() != num_hosts:
         sleep(5)
 
+    # Since ssh takes some time to come up
+    sleep(30)
     print "Awake!"
 
 
